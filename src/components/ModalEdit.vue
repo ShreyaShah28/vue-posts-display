@@ -1,31 +1,34 @@
 <script lang="ts" setup>
-import { ref, toRaw } from 'vue'
+import { computed, ref, toRaw } from 'vue'
 import { usePostsStore } from '../stores/PostsStore'
+import useVuelidate from '@vuelidate/core'
+import { helpers, required, maxLength } from '@vuelidate/validators'
 
 const stores = usePostsStore()
 const postData = ref({})
 const enableName = ref(true)
 const enableDescription = ref(true)
-const usernameError = ref('')
-const catchPhraseError = ref('')
+
+const rules = computed(() => ({
+  username: {
+    required: helpers.withMessage('* Please enter some text', required),
+    maxLength: helpers.withMessage('* Character limit is 25', maxLength(25)),
+  },
+  company: {
+    catchPhrase: {
+      required: helpers.withMessage('* Please enter some text', required),
+    },
+  },
+}))
+
+const v$ = useVuelidate(rules, postData)
 
 function validateFields() {
-  usernameError.value = ''
-  catchPhraseError.value = ''
+  v$.value.$touch()
+  if (v$.value.$invalid) return
 
-  // username validation
-  if (!postData.value.username?.trim()) {
-    usernameError.value = 'Username is required'
-  } else if (postData.value.username.length > 25) {
-    usernameError.value = 'Max 25 characters allowed'
-  }
-
-  // catchPhrase validation
-  if (!postData.value.company?.catchPhrase?.trim()) {
-    catchPhraseError.value = 'Description is required'
-  }
-
-  return !usernameError.value && !catchPhraseError.value
+  v$.value.$reset()
+  return true
 }
 
 function loadInitialData() {
@@ -36,8 +39,6 @@ function updatePost() {
   if (validateFields()) {
     stores.updatePost(postData.value)
     console.log(postData.value)
-    usernameError.value = ''
-    catchPhraseError.value = ''
   }
 }
 
@@ -62,6 +63,7 @@ loadInitialData()
             <input
               type="text"
               :disabled="enableName"
+              @blur="v$.username.$touch()"
               v-model="postData.username"
               class="text-2xl bg-purple-200 disabled:bg-purple-300 text-purple-800 border-none outline-none focus:outline-none rounded-2xl p-2"
             />
@@ -69,8 +71,10 @@ loadInitialData()
               <i class="fa-solid fa-pen text-lg"></i>
             </button>
           </div>
-          <p v-if="usernameError !== ''" class="text-red-600 text-lg">
-            {{ usernameError }}
+          <p class="text-red-600 text-lg">
+            <span v-for="err in v$.username.$errors" :key="err.$uid">
+              {{ err.$message }}
+            </span>
           </p>
         </div>
       </div>
@@ -82,6 +86,7 @@ loadInitialData()
               <textarea
                 :disabled="enableDescription"
                 rows="5"
+                @blur="v$.company.catchPhrase.$touch()"
                 v-model="postData.company.catchPhrase"
                 placeholder="Enter New Post Description"
                 class="text-2xl bg-purple-200 disabled:bg-purple-300 text-purple-800 placeholder:text-purple-400 mt-2 p-4 w-full border-none outline-none focus:outline-none rounded-2xl"
@@ -93,8 +98,10 @@ loadInitialData()
                 <i class="fa-solid fa-pen text-lg"></i>
               </button>
             </div>
-            <p v-if="catchPhraseError !== ''" class="text-red-600 text-lg">
-              {{ catchPhraseError }}
+            <p class="text-red-600 text-lg">
+              <span v-for="err in v$.company.catchPhrase.$errors" :key="err.$uid">
+                {{ err.$message }}
+              </span>
             </p>
             <button
               type="button"
